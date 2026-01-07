@@ -1,6 +1,5 @@
 import tkinter as tk
 import communication_controller as comm
-import psutil
 
 color = "#71C4FF"
 class Window(tk.Tk):
@@ -72,13 +71,22 @@ class Window(tk.Tk):
                             self.username_entry.get(), self.password_entry.get(), self.will_topic_entry.get(), self.will_message_entry.get(), will_qos)))
         self.connect_button.grid(row=1,column=0,columnspan=1,pady=(8,0),sticky="ew") 
 
+        self.disconnect_button=tk.Button(self, text=" Disconnect ",font=("Arial", 12,"bold"), bg="#0052CD",fg="white",padx=10, pady=6,
+                            command=lambda: (self.comm.disconnect()))
+        self.disconnect_button.grid(row=1,column=1,columnspan=1,pady=(8,0),sticky="ew")
+
         self.publish_button=tk.Button(self, text="  Publish  ",font=("Arial", 12,"bold"), bg="#0052CD",fg="white",padx=10, pady=6,command=lambda: (publish_window()))
-        self.publish_button.grid(row=1,column=1,columnspan=1,pady=(8,0),sticky="ew")
+        self.publish_button.grid(row=2,column=1,columnspan=1,pady=(8,0),sticky="ew")
             
+
+        self.subscribe_button=tk.Button(self, text=" Subscribe ",font=("Arial", 12,"bold"), bg="#0052CD",fg="white",padx=10, pady=6,command=lambda: (subscribe_window()))
+        self.subscribe_button.grid(row=2,column=0,columnspan=1,pady=(8,0),sticky="ew")
+
         def publish_window():
             pub_win = tk.Toplevel(self)
             pub_win.title("Publish Message")
             pub_win.geometry("400x300")
+            pub_win.resizable(False,False)
             pub_win.config(padx=20, pady=20, bg=color)
 
             tk.Label(pub_win, text="Topic:",bg=color,font=("Arial", 12)).grid(row=0, column=0, padx=10, pady=10)
@@ -101,6 +109,50 @@ class Window(tk.Tk):
                                 command=lambda :send_publish())
             send_button.grid(row=2,column=0,columnspan=2,pady=(8,0),sticky="ew")
 
+        def subscribe_window():
+            sub_win = tk.Toplevel(self)
+            sub_win.title("Subscribe to Topic")
+            sub_win.geometry("400x400")
+            sub_win.resizable(False,False)
+            sub_win.config(padx=20, pady=20, bg=color)
+
+            sub_win.grid_columnconfigure(0, weight=0)
+            sub_win.grid_columnconfigure(1, weight=1)
+            sub_win.grid_columnconfigure(2, weight=1)
+
+            tk.Label(sub_win, text="Topic:",bg=color,font=("Arial", 12)).grid(row=0, column=0, padx=10, pady=10)
+            topic_var = tk.StringVar(value="CPU Frequency")
+            topic_menu=tk.OptionMenu(sub_win, topic_var, "CPU Frequency", "CPU Usage", "Memory Usage")
+            topic_menu.grid(row=0,column=1,padx=10,pady=10)
+
+            tk.Label(sub_win, text="QoS: ",bg=color,font=("Arial", 12)).grid(row=1, column=0, padx=10, pady=10)
+            qos_var = tk.StringVar(value="0")
+            qos_menu = tk.OptionMenu(sub_win, qos_var, "0", "1", "2")
+            qos_menu.grid(row=1, column=1, padx=10, pady=10)
+
+            tk.Label(sub_win, text="Message:", bg=color, font=("Arial", 12)).grid(row=2, column=0, padx=10, pady=10, sticky="w")
+
+            textbox = tk.Text(sub_win, height=5, width=10)
+            textbox.grid(row=2, column=1, columnspan=2, padx=10, pady=10, sticky="nsew")        
+
+            def send_subscribe():
+                topic_message = topic_var.get()
+                qos = int(qos_var.get())
+                self.comm.subscribe_topic(topic_message, qos)
+        
+            send_button=tk.Button(sub_win, text=" Subscribe ",font=("Arial", 12,"bold"), bg="#0052CD",fg="white",padx=10, pady=6,
+                                command=lambda :send_subscribe())
+            send_button.grid(row=3,column=0,columnspan=2,pady=(8,0),sticky="ew")    
             
-window = Window(500, 800)
+            def update_textbox():
+                if self.comm.received_message is not None:
+                    textbox.insert(tk.END, f"{self.comm.received_topic}: {self.comm.received_message}\n")
+                    textbox.see(tk.END)
+                    self.comm.received_message = None
+                sub_win.after(200, update_textbox)
+
+            update_textbox()
+            
+            
+window = Window(500, 650)
 window.mainloop()

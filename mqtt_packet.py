@@ -41,7 +41,7 @@ class MqttPacket:
             data = str(s).encode("utf-8")
         return struct.pack("!H", len(data)) + data
 
-    def connect_packet(self, client_id: str, keep_alive: int = 60, clean_start: bool = True, 
+    def connect_packet(self, client_id: str, keep_alive: int, clean_start: bool = True, 
                        username: str = None, password: str = None, will_topic: str = None, will_message: str = None, will_qos=0) -> bytes:
         
         vh = bytearray()
@@ -101,7 +101,12 @@ class MqttPacket:
         payload = bytearray()
 
         payload+= self.encode_string(topic)
-        payload.append(qos & 0x03)
+        sub_options = 0x00
+        if qos==1:
+            sub_options |= 0x01
+        elif qos==2:
+            sub_options |= 0x02
+        payload.append(sub_options)
     
         remaining = len(vh)+len(payload)
 
@@ -151,11 +156,56 @@ class MqttPacket:
         vh = bytearray()
         vh += packet_id.to_bytes(2, "big")
         vh.append(0x00)
-        
+
         remaining = len(vh)
 
         fixed = bytearray()
         fixed.append(0x62)  
+        fixed += self.encode_varint(remaining)
+
+        return bytes(fixed + vh)
+    
+    def disconnect_packet(self) -> bytes:
+        packet = bytearray()
+        packet.append(0xE0)  
+        packet.append(0x00)  
+        packet.append(0x01)
+        packet.append(0x00)
+        return bytes(packet)
+
+    def puback_packet(self, packet_id: int) -> bytes:
+        vh = bytearray()
+        vh += packet_id.to_bytes(2, "big")
+        vh.append(0x00)
+
+        remaining = len(vh)
+
+        fixed = bytearray()
+        fixed.append(0x40)
+        fixed += self.encode_varint(remaining)
+
+        return bytes(fixed + vh)
+    
+    def pubrec_packet(self, packet_id: int) -> bytes:
+        vh = bytearray()
+        vh += packet_id.to_bytes(2, "big")
+
+        remaining = len(vh)
+
+        fixed = bytearray()
+        fixed.append(0x50)  
+        fixed += self.encode_varint(remaining)
+
+        return bytes(fixed + vh)
+    
+    def pubcomp_packet(self, packet_id: int) -> bytes:
+        vh = bytearray()
+        vh += packet_id.to_bytes(2, "big")
+
+        remaining = len(vh)
+
+        fixed = bytearray()
+        fixed.append(0x70)  
         fixed += self.encode_varint(remaining)
 
         return bytes(fixed + vh)
