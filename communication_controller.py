@@ -3,6 +3,7 @@ import select
 import time
 import threading
 from mqtt_packet import MqttPacket as mqtt
+import psutil
 
 running = True
 
@@ -13,6 +14,7 @@ class CommunicationController:
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.packet_type = None
         self.connected = False
+        self.packet_id=0
         self.pkt = mqtt()
 
     def receive_function(self):
@@ -32,34 +34,25 @@ class CommunicationController:
                 self.connack()
             if self.packet_type == b'\xd0':
                 self.pingresp()
-
+            if self.packet_type == b'\x40':
+                self.puback()
+            if self.packet_type == b'\x50':
+                self.pubrec()
+            if self.packet_type == b'\x70':
+                self.pubcomp()
+            
     def connack(self):
-        rl_bytes = bytearray()
-        while True:
-            try:
-                b = self.sock.recv(1)
-            except BlockingIOError:
-                print("CONNACK: Exceptie la citirea remaining length")
-                break
-            rl_bytes.append(b[0])
-            if (b[0] & 0x80) == 0:
-                break
+    
+        remaining_length = self.sock.recv(1)
+        rl = int.from_bytes(remaining_length, byteorder="big")
+        packet = self.sock.recv(rl)
 
-        remaining_length, _ = mqtt.decode_varint(bytes(rl_bytes))
-        body = bytearray()
-        while len(body) < remaining_length:
-            try:
-                chunk = self.sock.recv(remaining_length - len(body))
-            except BlockingIOError:
-                print("CONNACK: Exceptie la citirea body")
-            body.extend(chunk)
-
-        reason_code = body[1]
+        reason_code = packet[1]
         if reason_code == 0x00:
             self.connected = True
         elif reason_code != 0x00:
             raise RuntimeError(f"CONNACK: Eroare, reason={reason_code}")
-        print("Packet type:", self.packet_type, "RL:", remaining_length, "Body hex:", body.hex(" "))
+        print("Packet type:", self.packet_type, "RL:", rl, "Body hex:", packet.hex())
         
     def connect_to_server(self, client_id: str, username: str, password: str, will_topic: str, will_message: str = None, will_qos: int = 0):
         self.sock.connect((self.host, self.port))
@@ -84,10 +77,45 @@ class CommunicationController:
         print("PINGRESP primit de la broker.")
         
 
-    def publish_message(self, topic: str, message: str, qos: int = 0):
+    def publish_message(self, topic: str, qos: int = 0):
         if not self.connected:
             raise RuntimeError("Nu sunt conectat la broker.")
-        
-        packet = self.pkt.publish_packet(topic, message, qos)
+
+        if qos>=1:
+            self.packet_id += 1
+        if topic == "CPU Frequency":
+            message = "CPU Frequency: " + str(psutil.cpu_freq().current)+ " MHz"
+        if topic == "CPU Usage":
+            message = "CPU Usage: " + str(psutil.cpu_percent())+ " %"
+        if topic == "Memory Usage":
+            message = "Memory Usage: " + str(psutil.virtual_memory().percent)+ " %"
+        packet = self.pkt.publish_packet(self.packet_id, topic, message, qos)
         self.sock.sendall(packet)
-        print(f"[COMM] Mesaj publicat pe topicul '{topic}': {message}")
+        print(f"[COMM] Mesaj cu id-ul {self.packet_id} publicat pe topicul '{topic}': {message}")
+
+    def puback(self):
+        remaining_length = self.sock.recv(1)
+        rl = int.from_bytes(remaining_length, byteorder="big")
+        packet = self.sock.recv(rl)
+        packet_id = packet[1]
+        reason_code = packet[2].to_bytes(1, byteorder="big")
+        print(f"PUBACK cu id-ul {packet_id}, reason code {reason_code} primit de la broker.")
+
+    def pubrec(self):
+        remaining_length = self.sock.recv(1)
+        rl = int.from_bytes(remaining_length, byteorder="big")
+        packet = self.sock.recv(rl)
+        packet_id = packet[1]
+        reason_code = packet[0].to_bytes(1, byteorder="big")
+        print(f"PUBREC cu id-ul {packet_id}, reason code {reason_code} primit de la broker.")
+        if reason_code == b'\x00':
+            self.sock.sendall(self.pkt.pubrel_packet(packet_id))
+            print(f"PUBREL cu id-ul {packet_id} trimis catre broker.")
+    
+    def pubcomp(self):
+        remaining_length = self.sock.recv(1)
+        rl = int.from_bytes(remaining_length, byteorder="big")
+        packet = self.sock.recv(rl)
+        packet_id = packet[1]
+        reason_code = packet[0].to_bytes(1, byteorder="big")
+        print(f"PUBCOMP cu id-ul {packet_id}, reason code {reason_code} primit de la broker.")

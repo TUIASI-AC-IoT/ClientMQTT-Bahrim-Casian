@@ -82,30 +82,24 @@ class Window(tk.Tk):
             pub_win.config(padx=20, pady=20, bg=color)
 
             tk.Label(pub_win, text="Topic:",bg=color,font=("Arial", 12)).grid(row=0, column=0, padx=10, pady=10)
-            topic_entry=tk.Entry(pub_win)
-            topic_entry.insert(0,"")
-            topic_entry.grid(row=0,column=1,padx=10,pady=10)
+            topic_var = tk.StringVar(value="CPU Frequency")
+            topic_menu=tk.OptionMenu(pub_win, topic_var, "CPU Frequency", "CPU Usage", "Memory Usage")
+            topic_menu.grid(row=0,column=1,padx=10,pady=10)
 
-            tk.Label(pub_win, text="Message: ",bg=color,font=("Arial", 12)).grid(row=1, column=0, padx=10, pady=10)
-            message_entry=tk.Entry(pub_win)
-            message_entry.insert(0,"")
-            message_entry.grid(row=1,column=1,padx=10,pady=10)
 
-            tk.Label(pub_win, text="QoS: ",bg=color,font=("Arial", 12)).grid(row=2, column=0, padx=10, pady=10)
+            tk.Label(pub_win, text="QoS: ",bg=color,font=("Arial", 12)).grid(row=1, column=0, padx=10, pady=10)
             qos_var = tk.StringVar(value="0")
             qos_menu = tk.OptionMenu(pub_win, qos_var, "0", "1", "2")
-            qos_menu.grid(row=2, column=1, padx=10, pady=10)
+            qos_menu.grid(row=1, column=1, padx=10, pady=10)
 
             def send_publish():
-                topic = topic_entry.get()
-                message = message_entry.get()
+                topic_message = topic_var.get()
                 qos = int(qos_var.get())
-                self.comm.publish_message(topic, message, qos)
-                pub_win.destroy()
+                self.comm.publish_message(topic_message, qos)
 
             send_button=tk.Button(pub_win, text="  Send  ",font=("Arial", 12,"bold"), bg="#0052CD",fg="white",padx=10, pady=6,
-                                command=send_publish)
-            send_button.grid(row=3,column=0,columnspan=2,pady=(8,0),sticky="ew")
+                                command=lambda :send_publish())
+            send_button.grid(row=2,column=0,columnspan=2,pady=(8,0),sticky="ew")
 
             
 window = Window(500, 800)

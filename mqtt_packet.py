@@ -28,7 +28,7 @@ class MqttPacket:
             byte = buf[offset + consumed]
             consumed += 1
             value += (byte & 0x7F) * multiplier
-            if (byte & 0x80) == 0:  # MSB=0 → ultimul byte
+            if (byte & 0x80) == 0:  
                 break
             multiplier *= 128
         return value, consumed
@@ -135,7 +135,7 @@ class MqttPacket:
         remaining = len(vh) + len(payload_bytes)
 
         fixed = bytearray()
-        fixed.append((0x03<<4) | flags)
+        fixed.append(0x30 | flags)
         fixed += self.encode_varint(remaining)
 
         return bytes(fixed + vh + payload_bytes)
@@ -146,3 +146,16 @@ class MqttPacket:
         fixed.append(0xC0)  
         fixed.append(0x00)  
         return bytes(fixed)
+    
+    def pubrel_packet(self, packet_id: int) -> bytes:
+        vh = bytearray()
+        vh += packet_id.to_bytes(2, "big")
+        vh.append(0x00)
+        
+        remaining = len(vh)
+
+        fixed = bytearray()
+        fixed.append(0x62)  
+        fixed += self.encode_varint(remaining)
+
+        return bytes(fixed + vh)
