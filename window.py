@@ -144,6 +144,11 @@ class Window(tk.Tk):
                                 command=lambda :send_subscribe())
             send_button.grid(row=3,column=0,columnspan=2,pady=(8,0),sticky="ew")    
             
+            unsub_button=tk.Button(sub_win, text=" Unsubscribe ",font=("Arial", 12,"bold"), bg="#0052CD",fg="white",padx=10, pady=6,
+                                command=lambda :self.comm.unsubscribe_topic(topic_var.get()))
+            unsub_button.grid(row=4,column=0,columnspan=2,pady=(8,0),sticky="ew")
+
+            
             def update_textbox():
                 if self.comm.received_message is not None:
                     textbox.insert(tk.END, f"{self.comm.received_topic}: {self.comm.received_message}\n")

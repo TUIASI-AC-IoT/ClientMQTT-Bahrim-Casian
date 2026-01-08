@@ -130,7 +130,7 @@ class MqttPacket:
         if qos > 0:
             vh += packet_id.to_bytes(2, "big")
 
-        vh += self.encode_varint(0)
+        vh.append(0x00)
         
         if isinstance(payload, (bytes, bytearray)):
             payload_bytes = bytes(payload)
@@ -209,3 +209,19 @@ class MqttPacket:
         fixed += self.encode_varint(remaining)
 
         return bytes(fixed + vh)
+    
+    def unsubscribe_packet(self, packet_id: int, topic:str) -> bytes:
+        vh = bytearray()
+        vh += packet_id.to_bytes(2, "big")
+        vh.append(0x00)
+
+        payload = bytearray()
+        payload += self.encode_string(topic)
+
+        remaining = len(vh) + len(payload)
+
+        fixed = bytearray()
+        fixed.append(0xA2)  
+        fixed += self.encode_varint(remaining)
+        print(fixed + vh + payload)
+        return bytes(fixed + vh + payload)

@@ -57,6 +57,9 @@ class CommunicationController:
                 self.receive_publish()
             if self.packet_type == 0x06:
                 self.pubrel()
+            if self.packet_type == 0x0B:
+                self.unsuback()
+
         self.connected = False
 
 
@@ -108,14 +111,17 @@ class CommunicationController:
         if qos>=1:
             self.packet_id += 1
         if topic == "CPU Frequency":
-            message = "CPU Frequency: " + str(psutil.cpu_freq().current())+ " MHz"
+            message = "CPU Frequency: " + str(psutil.cpu_freq().current)+ " MHz"
         if topic == "CPU Usage":
             message = "CPU Usage: " + str(psutil.cpu_percent())+ " %"
         if topic == "Memory Usage":
             message = "Memory Usage: " + str(psutil.virtual_memory().percent)+ " %"
         packet = self.pkt.publish_packet(self.packet_id, topic, message, qos)
         self.sock.sendall(packet)
-        print(f"[COMM] Mesaj cu id-ul {self.packet_id} publicat pe topicul '{topic}': {message}")
+        if qos>=1:
+            print(f"[COMM] Mesaj cu id-ul {self.packet_id} publicat pe topicul '{topic}': {message}")
+        else:
+            print(f"[COMM] Mesaj publicat pe topicul '{topic}': {message}")
 
     def puback(self):
         remaining_length = self.sock.recv(1)
@@ -196,7 +202,7 @@ class CommunicationController:
         if publish_qos > 0:
             packet_id = packet[topic_length+2:topic_length+4]
             
-            self.received_message = packet[4+topic_length:rl].decode('utf-8')
+            self.received_message = packet[5+topic_length:rl+1].decode('utf-8')
             print(f"[COMM] Mesaj cu id-ul {packet_id}, qos {publish_qos} publicat primit pe topicul '{self.received_topic}': {self.received_message}")
 
             if publish_qos==1:
@@ -207,7 +213,6 @@ class CommunicationController:
                 self.sock.sendall(self.pkt.pubrec_packet(int.from_bytes(packet_id, "big")))
                 print(f"Trimis PUBREC pentru mesajul {self.received_message} cu id-ul {packet_id}")
             
-
         if publish_qos==0:
             self.received_message = packet[3+topic_length:rl].decode('utf-8')
             print(f"[COMM] Mesaj publicat cu qos {publish_qos} primit pe topicul '{self.received_topic}': {self.received_message}")
@@ -222,3 +227,21 @@ class CommunicationController:
             self.sock.sendall(self.pkt.pubcomp_packet(packet_id))
             print(f"Trimis PUBCOMP pentru mesajul {self.received_message} cu id-ul {packet_id}")
         print(f"PUBREL cu id-ul {packet_id}, reason code {reason_code} primit de la broker.")
+
+    def unsubscribe_topic(self, topic: str):
+        if not self.connected:
+            raise RuntimeError("Nu sunt conectat la broker.")
+
+        self.packet_id += 1
+        packet = self.pkt.unsubscribe_packet(self.packet_id, topic)
+        self.sock.sendall(packet)
+        print(f"[COMM] Cerere de unsubscribe cu id-ul {self.packet_id} trimisa pentru topicul '{topic}'.")
+
+
+    def unsuback(self):
+        remaining_length = self.sock.recv(1)
+        rl = int.from_bytes(remaining_length, byteorder="big")
+        packet = self.sock.recv(rl)
+        packet_id = packet[1]
+        reason_code = packet[2].to_bytes(1, byteorder="big")
+        print(f"UNSUBACK cu id-ul {packet_id}, reason code {reason_code} primit de la broker.")
